@@ -1,0 +1,605 @@
+---
+title: Use of openly available occurrence data to generate biodiversity map within the _EEZ_ of South Africa
+author: "Dawit Yemane"
+date: '`r Sys.time()`'
+always_allow_html: yes
+output:
+  pdf_document:
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 12
+    highlight: tango
+    latex_engine: pdflatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: no
+  html_document:
+    code_folding: show
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 14
+    mathjax: local
+    number_sections: yes
+    self_contained: no
+    smart: no
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+csl: ices-journal-of-marine-science.csl
+bibliography:
+- Refs-requiredLibs_Analysis.bib
+- Refs-requiredLibs_Analysis_sppDist.bib
+---
+
+```{r chnk0,eval=TRUE,echo=FALSE,cache=TRUE}
+## This will add a 'hook' for verbatim=TRUE
+## Thanks to https://ramnathv.github.io/posts/verbatim-chunks-knitr/
+library(knitr)
+hook_source_def = knit_hooks$get('source')
+knit_hooks$set(source = function(x, options){
+  if (!is.null(options$verbatim) && options$verbatim){
+    opts = gsub(",\\s*verbatim\\s*=\\s*TRUE\\s*", "", options$params.src)
+    bef = sprintf('<a name=\"test\"></a>\n\n    ```{r %s}\n', opts, "\n")
+    stringr::str_c(bef, paste(knitr:::indent_block(x, "    "), collapse = '\n'), "\n    ```\n")
+  } else {
+     hook_source_def(x, options)
+  }
+
+}
+)
+
+knitr::opts_chunk$set(cache = TRUE,echo = FALSE)
+
+```
+
+```{r chnk1,eval=TRUE,echo=F,message=FALSE,tidy=TRUE,warning=FALSE,results='hide'}
+############################ Load the libraries ###########################
+libLst=c('tidyverse','reshape','captioner','magrittr','broom','xtable','fields','knitr','flextable','kableExtra',
+         'raster','sf','automap','magrittr','grid','ggrepel','ggsn')
+invisible(suppressPackageStartupMessages(lapply(libLst,library,character.only=T)))
+
+
+tabCaps=captioner(prefix='Table')
+figCaps=captioner(prefix='Figure')
+
+#### Table captions
+tabCaps(name='tab1',caption='Performance measures for each of the eight models and the three size class.')
+tabCaps(name='tab2',caption='Model summary statistics: smooth component.')
+tabCaps(name='tab3',caption='Model summary statistics: parametric component.')
+
+
+##Figure captions
+## methods and environmental pattern
+figCaps('fig1',caption="Schematic showing the process of generating biodiversity maps in this study, including all steps from accessing of occurrence and environmental data to the generation of maps. EEZ – referring to the EEZ of South Africa; SDM -  Species Distribution Model; CTA – Classification Tree Analysis; RF -  Random Forest; MARS – Multivariate Adaptive Regression Analysis; ANN – Artificial Neural Network; GLM – Generalized Linear Model; AUC – Area Under Curve of the Receiver Operating Characteristic (ROC) curve.")
+figCaps('fig2',caption='Map of the study region delineating the EEZ of South Africa.')
+figCaps(name='fig3',caption="Environmental layers used for species distrbution modelling. bottom depth ($meters$), bottom dissolved oxygen ($mmol. m^{-3}$), bottom dissolved iron ($mmol. m^{-3}$), bottom light intensity ($E. m^{2}. yr^{-1}$) [in log space] zeros color coded as 'gray', bottom primary prodcutivity ($g. m^{-3}. day^{-1}$) [in log space], bottom salinity ($PSS$), bottom topographic roughness TRI ($meters$), surface chlorophyll ($mg. m^{-3}$) [in log space], surface salinity ($PSS$), surface  silicate ($mmol. m^{-3}$),surface tempertature ($^\\circ C$)")
+
+# main results
+figCaps(name='fig4',caption="Summary of the relative influence of the environmental variables across speciess within each of the three functional groups.")
+figCaps(name='fig5',caption="Overall pattern in biodiversity of zooplankton, benthos, and fishes based. Species distribtion maps combined to generate biodiversity based on the regression method.")
+
+# appenix figures
+figCaps(name='figA1',caption="Zooplankton: summary of the distribution of sampling activity, and pattern in species richness, in the different periods.")
+figCaps(name='figA2',caption="Fishes: summary of the distribution of sampling activity, and pattern in species richness, in the different the periods.")
+figCaps(name='figA3',caption="Benthos: summary of the distribution of sampling activity, and pattern in species richness, in the different periods.")
+
+
+figCaps(name='figB1',caption="Overall pattern in biodiversity of zooplankton, benthos, and fishes based. Species distribtion maps combined to generate biodiversity based on stacking binaries method.")
+figCaps(name='figB2',caption="Overall pattern in biodiversity of zooplankton, benthos, and fishes based. Species distribtion maps combined to generate biodiversity based on stacking probabilities method.")
+
+figCaps(name='figC1',caption="Fish: Sample distribution maps for selected species. Open circles denote location of known presence. Group 1")
+figCaps(name='figC2',caption="Fish: Sample distribution maps for selected species. Open circles denote location of known presence. Group 2")
+figCaps(name='figC3',caption="Benthos: Sample distribution maps for selected species. Open circles denote location of known presence. Group 1")
+figCaps(name='figC4',caption="Benthos: Sample distribution maps for selected species. Open circles denote location of known presence. Group 2")
+figCaps(name='figC5',caption="Zooplankton: Distribution maps. Open circles denote location of known presence. Group 1 ")
+figCaps(name='figC6',caption="Zooplankton: Distribution maps. Open circles denote location of known presence. Group 2 ")
+figCaps(name='figD1',caption="Pattern in biodiversity for the three major classes _Actinoptergyii_, _Cephalopoda_, _Elasmobranchii_.") 
+
+
+```
+
+# Abstract
+
+Biodiversity maps are one of important components of conservation and ecosystem aware spatial management strategy. Biodiversity maps in the past are largely obtained based on patchy occurrence data from a range of sources. Currently substantial amount of occurrence data are readily available for large part of the of the world and can usually be accessed progamatically. Considering observed, and expected changes in response to future climate change, in species distribution and hence the biodiversity it is important to make use of these readily available occurrence data of many species and construct biodiversity maps. This study aimed to generate overall biodiversisty for three generic functional groups: zooplankton, fishes, and benthos within the _EEZ_ of South Africa. This was achieved by stacking individual species distribution maps by modelling the distribution of all most of the species with all known occurrence records within the _EEZ_. Freely available occurrence data from _obis_ was accessed for this purpose. An ensemble species distribution modelling was applied based on five widely applied statistical methods to generate indvidual species distribution. The result of this study the potential values of opensource occurrence and environmental data to generate biodiversity maps that can potentially be used in future spatial management planning and in the study of the potential influence of environmental change, includig climate variability and change, on the biodiversity of ecosystems. 
+
+
+
+# Introduction
+
+Mapping of biodiversity  (species richness / -diversity) and understanding of the biological, environmental and evolutionary processes that regulate local and regional species distributions, are of importance for understanding biodiversity patterns and for biodiversity management and conservation. This is particularly so because future changes (and variability) in climate are expected to affect the distributions of species and hence biodiversity patterns. In addition biodiversity maps and indices are important inputs for spatial management planning, such as the development of area-based conservation measures. Globally there is increased work on documentation and characterization of spatial (and when possible temporal) patterns in biodiversity for various spatial domains, including for coastal or near-shore areas [e.g South Africa - @turpie2000biogeography; @awad2002distribution; @griffiths2010marine], at the scale of the whole-basin [e.g Mediterranean sea - @coll2012mediterranean], or Large Marine Ecosystems [Benguela Current Large Marine Ecosystem - @kirkman2013identifying; @kirkman2016spatial] and globally [e.g @briggs2012realignment]. 
+
+Mainland South Africa has an Exclusive Economic Zone EEZ of 1072679. The total numbers of marine species (across all taxonomic groups) recorded for South African waters is at least 12914, although smaller size species are under-represented [@griffiths2010marine] and this was largely based on surveys of coastal, near-shore and shelf areas. The EEZ provides a range of goods and services for South Africans: it supports diverse groups of marine organisms, a wide range of which are targeted by various fishing sectors, minerals and fossil fuels that are extracted by the mining and oil and gas industries, as well opportunity for aquaculture, recreation and tourism and other activities. Globally, escalating human activity, both extractive and non-extractive, associated with increased human demand and competition for ocean space and ocean products in recent times [e.g. @halpern2015spatial] is resulting in habitat degradation, species extinctions, ultimately compromising ecosystem service delivery [@eichbaum1996role; @carpenter2006scenarios; @worm2006impacts; @mccauley2015marine]. In South Africa, to reduce or mitigate such effects, spatial management measures are among the approaches that have been put forward to reduce or mitigate for such effects, including marine spatial planning (MSP) informed by descriptions of Ecologically or Biologically Significant Areas (EBSAs) [@kirkman2019using; @kirkman2016spatial] and expanding the national coverage of marine protected areas (MPA) from less than 0.5% of the mainland EEZ to approximately 5%, through the development of an expanded network that is representative of nearly all ecosystem types, including offshore ecosystems [@sink2016marine; @govsa2016natmpa]. Critical input for these approaches included spatialized layers representing habitat features, ecosystem types, ecological processes as well as biodiversity distributions and patterns [@sink2011systematic; @holness2014spatial]. Absence of synthetic biodiversity maps precluded their inclusion in previous marine spatial planning. Currently occurrence data for about 120000 marine species, ranging from bacteria to whales, and covering all parts of the ocean from the surface to bottom, is collated and made readily available from Ocean Biogeographic Information System (OBIS). This data has been used in biodiversity and biogeography studies [@tittensor2010global; @selig2014global]. This openly available occurrence data can, for example, be used to study distribution pattern of selected species or all species within a pre-defined region and then stacked to generate biodiversity maps.
+
+Traditionally bioidiversity maps are generated by aggregating occurrence points in a grid [@roberts2002marine]. The main advantage of this approach is that there is no need for extrapolation but only provides picture of biodiversity at a coarser spatial resoultion and tends to be less accurate as one looks at finer resolution as they are mostly based on patchy records [@schmitt2017ssdm]. Biodiversity maps are also generated from macro-ecological models where site/station/quadrat level species richness are linked to environmental variables and richness modelled using range of statistical models [@ferrier2006spatial]. The increase in the amount of readily available, for many species, occurrence data led to the use of individual species distribution modelling to generate biodiviversity maps,generally referred to as stacking whereby individual species distribution maps are stacked to produce biodiversity maps. This used to be typically done by simply summing binary distribution maps or summing probability of occurrences of individual species  [@d2015using] here refferred to as _stacking binaries_ and _stacking probabilities_. 
+
+
+This study will be the first in providing comprhensive view of biodiversty within the _EEZ_ of South Africa and across three major functional groups and solely based freely available opensoure data. The objective of this study is two fold 1) demonstration of the value open source occurrence data with potential uses in biodiversity and conservation (or spatial management) work 2) to generate biodiversity maps for selected broad functional groups by stacking individual species distribution maps.
+
+```{r chnk2,eval=TRUE,echo=FALSE,include=FALSE,cache=FALSE}
+
+# load processed basemaps related objects
+load(here::here('analysis/base_map_related.RData'))
+# load biodiversity map related objects
+load(here::here('analysis/biodiversity/processed_biodiversity_all_methods.RData'))
+# load historical distribution map related objects
+load(here::here('analysis/historical_map_related.RData'))
+# load selected species distribution maps
+load(here::here('analysis/distribution/processed_sample_distn_map.RData'))
+
+# load env data
+env_rast_sel <- SSDM::load_var(here::here('data/sel_env/sa/'))
+
+
+## custom scale_x and scale_y functions to prepare x and y axsis labels
+scale_x_longitude <- function(xmin=-180, xmax=180, step=1, ...) {
+  xbreaks <- seq(xmin,xmax,step)
+  xlabels <- unlist(lapply(xbreaks, function(x) ifelse(x < 0, paste0(x,"\u00b0", "W"), 
+                                                       ifelse(x > 0,paste0(x,"\u00b0", "E"),x))))
+  return(scale_x_continuous("Longitude", breaks = xbreaks, labels = xlabels, expand = c(0.1, 0.1), ...))
+}
+scale_y_latitude <- function(ymin=-90, ymax=90, step=0.5, ...) {
+  ybreaks <- seq(ymin,ymax,step)
+  ylabels <- unlist(lapply(ybreaks, function(x) ifelse(x < 0, paste0(x,"\u00b0", "S"), ifelse(x > 0, paste0(x,"\u00b0", "N"),x))))
+  return(scale_y_continuous("Latitude", breaks = ybreaks, labels = ylabels, expand = c(0.1, 0.1), ...))
+}    
+
+```
+
+# Methods
+
+All of the data used in this study were obtained from opensource data repositories and were programmatically retrieved and processed using R [@R-base]. Two main repositories were relied upon to obtain the environmental layer and occurrence data: OBIS <http://iobis.org/> for occurence data, GEBCO <https://www.gebco.net/> for bathymetry data, Bio-ORACLE <http://www.bio-oracle.org/> for the environmental layer. The broad functional group clasification of the taxons into _zooplankton_, _benthos_, and _fishes_ was achieved with the help of trait data from WoRMS <http://www.marinespecies.org/>. Schematics of the all the steps from accessing and processing of raw data, and modelling distribuion up to the construction of biodiversity maps are shown in `r figCaps('fig1', display='cite')`.
+
+```{r fig1,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,dpi=350,warning=FALSE,out.width='80%',out.height='80%'}
+knitr::include_graphics(here::here('figures/ Modeling_schematic_diag_sdm.jpg'))
+```
+`r figCaps('fig1')`
+
+Map of the study region, _EEZ_ of South Africa, is shown in  `r figCaps('fig2',display='cite')`.
+
+```{r fig2,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,dpi=350,warning=FALSE,out.width='80%',out.height='80%'}
+bathy_base<- ggplot()+ 
+  geom_sf(data = sa_shape_al,  color = "black", fill = "grey80") +
+  geom_sf(data = d_sa_cont,aes(linetype=n_level),show.legend = 'line')+
+  geom_sf(data = eez_sAfr_sf, fill=NA)+
+  scale_linetype_manual(name='depth',values = c("dotted", "solid", "dashed"))+
+  geom_text_repel(data = loc_cords_sel,aes(x = lon,y = ,lat,label=name),nudge_y = 0.9)+
+  xlab('longitude')+ylab('latitude')+ 
+  theme_bw()
+
+bathy_base_scale <- bathy_base+
+  ggsn::north(data = sa_shape_al,location = 'topright',symbol = 1,scale = 0.2)+#,x = 0.6,y = 0.8,scale = .15)
+  ggsn::scalebar(eez_sAfr_sf, dist = 100, dist_unit = "km", st.size = 2, 
+                 transform = TRUE, model = "WGS84",location = 'bottomright',border.size = 1)
+
+fil_col_opts<-c("gray44", "gray81", "khaki","floralwhite", "ghostwhite","gray81", "gray46", "gray33")
+
+
+inset_map<-ggplot()+geom_sf(data=al_afr_shape,colour=fil_col_opts[1],fill=fil_col_opts[5])+
+  geom_sf(data = sa_shape_al,fill='gray46')+
+  theme_bw()+labs(x=NULL,y=NULL)+
+  theme(axis.text.x =element_blank(),axis.text.y= element_blank(), axis.ticks=element_blank(),axis.title.x =element_blank(),
+        axis.title.y= element_blank())
+
+### All plots put together
+
+grid.newpage()
+v1<-viewport(width = 1, height = 1, x = 0.5, y = 0.5) #plot area for the main map
+v2<-viewport(width = 0.28, height = 0.17, x = 0.2, y = 0.8) #plot area for the inset map
+print(bathy_base_scale,vp=v1) 
+print(inset_map,vp=v2)
+
+
+```
+`r figCaps('fig2')`
+
+
+## Data: environmental
+
+All environmental layers used for species distributions were obatained from Bio-ORACLE. Currently Bio-ORACLE provides spatial layers (in two different formats: _ESRI_ shape files and geoTIFF) for 18 environmental variables that can, and are known to, influence species distributions [@assis2018bio]. In addtion all or selected layers can be retrieved directly from within _R_ using the _sdmpredictors_ [@R-sdmpredictors] package. The environmental layers retrieved from Bio-ORACLE were provided at 5 arcmin ( or $\sim 9.2km$). Environmental layers are provided for the present condition (2000-2014), obtained from pre-processed global ocean re-analysis data, (combining satellite remote sensing and in-situ observations), and future (2040-2050 and 2090-2100) from Atmosphere-Ocean General Circulation Models _AOGCMs_ made available by Coupled Model Inter-comparison Project _CMIP_ [@assis2018bio]. For the current study only layers for present conditions were considered. 
+
+Multicollinearity is an important problem for most regression models thus it is important to check for it among the environmental variables used in this study. In this study the existence and pervasiveness of multi-collinearity in the predictor variables was checked by calculating variance inflation factor _vif_ and it takes the following form:
+$$
+VIF_{j} = \frac{1}{(1-R^{2}_{(j)})}
+$$
+where $R^{2}_{(j)}$ is the coefficient of determination obtained by regressing the _jth_ variable against all the other variables. A variable that is un-correlated with all the other variables will have $VIF = 1$. In this study variables with $VIF>5$ were excluded from the predictor variable sets as it was the recommended threshold above which multi-collinearity can be a problem [@montgomery2012introduction]. 
+
+`r figCaps('fig3',display='cite')` shows climatolgy for the selected environmental variable, summarizing the present state in environmental condition, used to model species distribution. As can be seen the major and large scale hydrographic features off the coast of South Africa are captured [e.g. the high near shore surface chlorphyll that characterize the Southern Benguela, the cool shelf and near shore region characterizing west coast and the warm Agulhas current signature on south coast @jury2012physical] 
+
+
+
+```{r fig3,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=15,fig.height=10,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=300}
+# process environmenal layer
+env_rastSel <- raster::unstack(env_rast_sel)
+
+#,dev='tiff', dev.args=list(compression='lzw')
+
+cols_1 <- c("gray93", "gray86", "gray79")
+
+tlog <- function(x) log(x)
+env_rastSel_trans <- lapply(env_rastSel[c(3:5,8,10)], function(x) raster::calc(x,fun = tlog))
+env_rastSel[c(3:5,8,10)] <- env_rastSel_trans
+env_rastSel_stk <-raster::stack(env_rastSel)
+
+# prepare names
+rast_name <- names(env_rast_sel)
+rast_n_name <- str_replace_all(string = rast_name,pattern = 'bot_','bottom ')%>%
+  str_replace_all(string = .,pattern = 'sur_',replacement = 'surface ')%>%
+  str_remove_all(string = .,pattern = '.[0-9]')
+map_var_name  <- c("bottom depth"='bottom depth', 
+                     "bottom dissoxmean"="bottom dissolved oxygen",
+                     "bottom ironmean"="bottom iron",
+                     "bottom lightbotmean"="bottom light intensity", 
+                     "bottom ppmean"="bottom productivity",
+                     "bottom salinitymean"="bottom salinity",
+                     "bottom TRI"="bottom TRI", 
+                     "surface chlomean"="surface chlorophyll", 
+                     "surface salinitymean"="surface salintiy", 
+                     "surface silicatemean"="surface silicate",
+                     "surface tempmean"="surface temperature")
+#rast_var_unit <- c('$mg. m^{-3}$','$meter$','$mmol. m^{-3}$','$E. m^{2}. yr^{-1}$',
+#                   '$PSS$','$mg. m^{-3}$','$PSS$',
+#                   '$\\^\\circ C$')
+# additional pallette
+jet.colors <- colorRampPalette(rev(RColorBrewer::brewer.pal(11 , "Spectral")))
+
+
+comp_name <- map_var_name[rast_n_name]
+#names(env_rast_sel) <- comp_name
+add_polFun<-function(){
+  plot(sa_shape_sp,col='gray50',add=T)
+  plot(eez_sAfr_sp,add=T)
+}
+plot(env_rastSel_stk,col=fields::tim.colors(100),addfun=add_polFun,main=comp_name,cex=2.5)
+
+```
+`r figCaps('fig3')`
+
+
+## Data: occurrence
+
+Currently OBIS is one of the largest global open-source repositories for occurrence data of marine flora and fauna, allowing access to readily usable data that can have a wide range of applications : biodiversity and conservation research, generation and testing of ecological hypotheses, development of biodiversity baselines, biodiversity monitoring, spatial management projects, etc. OBIS currently enables occurrence data and biodiversity maps to be visualised online or retrieved to local hard disk using OBIS’ Application Programming Interface (API) or using an R package designed for this purpose _robis_ [@R-robis]. The occurrence data used in this study was extracted for the Benguela Current Large Marine Ecosystem (_BCLME_) which was then subsetted to the _EEZ_ of South Africa. 
+
+Only occurrence data obtained after the mid-1980s were considered. In addition the data were split into broad functional groups: fishes, including pelagic teleost fishes and sharks that occur between the surface and near the bottom (cephalopods were also included with this group); benthos, including benthic dwelling species; and zooplankton. For each of the three functional groups, species for which there were  fewer than 20 records of occurrence over the entire period were excluded from further analysis. A total of 16 species of zooplankton, 185 species of benthos, and 358 species of fishes were considered. 
+
+
+
+## Models
+
+The variety of statistical models that are used in species distribution modelling and can roughly grouped into two categories: joint species distribution models (JSDMS) where distributions (and/or abundance) of species are modelled jointly [e.g. @zhang2018comparing; @ovaskainen2016uncovering; @thorson2016joint; @thorson2015spatial], and separate species distribution models (SSDMS) [e.g. @shabani2016comparison; @schmitt2017ssdm] where the distribution of each species is modelled separately. In this study SSDMS are used. Several types of correlative statistical models can be used for SSDMS for the purpose of this study we consider five of them Generalized Linear Model (_GLMs_) [@mccullagh2018generalized; @nelder1972generalized], Classification Tree Analysis (_CTA_) [@james2013introduction], Random forest (_RF_) [@rforest_Rnews2002; @breiman2001random], Multivariate Adaptive Regression Spline (_MARS_) [@friedman1991multivariate; @marsearth2018], Artificial Neural Network (_ANN_) [@venablesRipley2002]. Individual occurrence maps of different species were then combined (stacking) to produce biodiversity maps. Both the SSDMS and the stacking of individual distribution maps were performed using the _ssdm_ package [@R-SSDM]. 
+
+##  Species distribution modelling
+
+Because this study was based  on species occurrence data, i.e. the geographic coordinates of locations where the species’ were observed (also known as presence only data) necessitates the generation of pseudo-absences. Distribution modelling based on just occurrence data involves: Gridded spatial domain available for the species of interest and environmental variables layer covering the spatial domain. The assumption here is that the spatial domain is randomly sampled and the observed presences occur proportional to the habitat preference of the species. Most the widely used models do require both presence and absence locations to model the probability of occurrence of the species of interest. In the context of presence only data this requires generation of pseudo-absences [@merow2014comparison] Currently there are four proposed approaches to be used to generate pseudo-absence: 1) randomly generate pseudo absences within the gridded spatial domain available to the species of interest (or the background data); 2) randomly generate pseudo-absences within predefined distance (to be specified by the user) from known presence location; 3) randomly generate pseudo-absence data from regions, within the defined spatial domain, that are environmentally different; and 4) the three step pseudo-absence generation -  its main purpose being to constrain the spatial extent and environmental range from which random pseudo-absence locations are generated and it involves a) specify (limiting) the extent of the spatial domain (background area). This was done by evaluating changes in variable importance by conducting PCA of the background environmental data at different distance from presence points (e.g 50km, 100km, 250,...etc). Then the optimal distance to constrain the spatial extent is selected as one above which the contribution of the most important variable to the first PCA decreases or stops increasing b) environmental profiling of the background area whereby environmental similarity is assessed and locations that are the least similar to the presence locations are retained and c) conduct k-means clustering of the background area identified in step b, where k is set to the number of presence location. The centroid from each cluster is assumed to be the good representation of the environmental feature space. The centroids are then projected back to the geographic space provides the coordinates of the pseudo-absence [@senay2013novel]. In this study the first approach was adopted to generate pseudo-absence and to reduce potential error due to randomisation the procedure was repeated three times.
+
+
+## Stacking distribution maps
+
+Typically the approaches for stacking individual species distribution maps to produce biodiversity maps have been to simply sum either  the binary distribution maps or the probabilities of occurrences of the various individual species [@d2015using]. These approaches shall be here referred to as ‘stacking binaries’ and ‘stacking probabilities’, respectively. While the stacking of individual species distributions has been used widely, prevailing criticism that is especially applicable for stacking binaries is the tendency to over-predict local species richness. This tendency for over-prediction could be interpreted to result from the fact that it is assumed for this approach that only abiotic filters influence local species richness when in reality, at least at a short time scale, both biotic and abiotic filters are known to operate [@d2015using]. However, @calabrese2014stacking showed that stacking binaries almost always tends to over-estimate local species richness because of the mathematical artefact of thresholding probability of occurrence to binary occurrence. Thus to address the issue of over-estimation of local species richness some alternative approaches have been suggested, namely to adjust predicted species richness using linear regression [@calabrese2014stacking], referred to here as the "regression method",  or to constrain species richness to the observed species richness, whereby predicted species richness is adjusted by probability ranking [@d2015using],  referred to here as the "probability ranking method". In this study,  the regression method was used to adjust the distribution maps before stacking. The approach is to adjust the probability of occurrence of each species at a site based on the richness at each site such that the adjusted probability of occurrence should provide accurate information about community composition [@calabrese2014stacking]. Modified application of the regresion method as implemented in the ssdm package [@R-SSDM; @schmitt2017ssdm] is given below:
+
+
+$$
+S_{obs}^{i}= a+bS_{raw}^{i}
+$$
+where $S_{obs}^{i}$ is observed species richness in site $i$, $S_{raw}^{i}$ raw species richness obtained by _stacking binaries_, $a$ and $b$ are estimated intercept and slope. Then the adjust richness map is obtained as follows:
+
+$$
+\widehat{S_{adj}^{i}} = a +bS_{raw}^{i}
+$$
+
+where $\widehat{S_{adj}^{i}}$ is the adjusted species richness in site $i$, $a$ and $b$ are esimtated regression coefficients estimated above.
+
+
+# Results
+
+The relative influence of all the predictors on the distribution of each of the species was assessed. To assess if there exist commonlaity in the influence of the environmental variables on the distribution with each of the three functional groups the frequency of the ranked importance, 9 - most important to 1 - least improtant, of each variables is summarised in `r figCaps('fig4',display='cite')`. Bottom temperature, bottom depth, and surface temperature were relatively consistently important influencing the distribution of most of the benthic species and hence their diversity. For fishes on the other hand with the exception of bottom depth, which appear to influence most species distribution, the various environmetal variables influenced distribution of fishes, and hence the overall diversity, to different extent. Zooplanlnktons distribution and the overall diversity  was often influenced by surface temperature and bottom depth and to a moderate extent by surface chlorophyll, bottom chlorophyll, and surfac salinity.
+
+```{r rel_imp,eval=TRUE,echo=FALSE,include=FALSE,cache=FALSE}
+
+all_var_imp<- read_csv(here::here('analysis/distribution/variable_importance_all_group.csv'))
+
+```
+
+```{r fig4,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=12,fig.height=10,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=300}
+
+#,dev='tiff',dev.args=list(compression='lzw')
+map_varImp  <- c("bot_depth"='bottom depth',
+                    "bot_ironmean" = "bottom iron",
+                     "bot_dissoxmean"="bottom dissolved oxygen", 
+                     "bot_lightbotmean"="bottom light intensity", 
+                     "bot_salinitymean"="bottom salinity", 
+                    "bot_ppmean"="bottom prductivity",
+                    "bot_salinitymean"="bottom salinity",
+                     "sur_chlomean"="surface chlorophyll", 
+                     "sur_salinitymean"="surface salintiy",
+                    "sur_silicatemean"="surface silicate",
+                     "sur_tempmean"="surface temperature",
+                 'bot_TRI'='bottom topographic roughness')
+
+all_var_imp%>%mutate(n_var_name =map_varImp[var_name])%>%
+  ggplot()+geom_boxplot(aes(n_var_name,rank),outlier.colour = NA)+
+  labs(y="index of importance",x='variables')+
+  facet_wrap(~type,nrow = 3)+theme_bw()+
+  theme(axis.text.x = element_text(angle = 90),text = element_text(size = 12))
+
+```
+`r figCaps('fig4')`
+
+Biodivesity maps, based on the combined data after the mid 1980s, for zooplnankton, benthos, and fishes is shown in `r figCaps('fig5',display='cite')`. Diversity of fishes on the west coast was the highest on the shelf-edge/slope region and nearshore areas from around _Saint Helena Bay_ east ward. On the south coast fish diveristy was highest in nearshore area and on the Agulhas bank. Benthos diversity was the higher in nearshore area with highest off the cape peninsula and off the east coast more pronounced off the Kwa-zulu Natal coast. Benthos species richnness was generally moderate to low. Diversity of zooplankton was on both west and south coast extending from the coast to shelf/shelf-edge and slope region.  
+
+```{r chnk3,eval=TRUE,echo=FALSE,include=FALSE,cache=TRUE}
+
+load(here::here('analysis/biodiversity/processed_biodiversity_all_methods.RData'))
+
+```
+
+
+```{r fig5,echo=FALSE,eval=T,fig.align="center",fig.width=14,fig.height=5,tidy=T,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+fish_al_ml<-all_biodiversity_long_ml%>%filter(func_grps=='Fish')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='NA')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+benthos_al_ml<-all_biodiversity_long_ml%>%filter(func_grps=='Benthos')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='NA')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+zoo_al_ml<-all_biodiversity_long_ml%>%filter(func_grps=='Zooplankton')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='NA')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+
+gridExtra::grid.arrange(fish_al_ml,benthos_al_ml,zoo_al_ml,nrow=1,clip='on')
+
+```
+`r figCaps('fig5')`
+
+
+# Discussion
+
+Lack of availability and insufficient taxonomic and spatial coverage of biodiversity data is one of the main constraint to better understand process and/or factors regulating biodiversity, to manage and conserve based on sound scientific methods. This problems do vary from region to region (or from one country to another country). Thus _OBIS_ was meant to help address this major gap by collating spatio-temporal occurrence data from wide range of sources for the whole globe and going back in time as far as the available data allows. The result from this study shows the potential uses of occurrence data from _OBIS_ to generate biodiversity maps for three major functional groups that could potentially be used in future conservation or spatial management projects and study of ecosystem structure and functioning. The potential values of biodiversity maps for conservation and systematic spatial planning can be seen in the work of @sink2011systematic and @grantham2011accommodating, as part of the national project on offshore marine protected areas. In both of the above cases the important of the biodiversity data, either for selected groups or for the whole system is higlighted and to a large extent index of diversity (sepecifically species richness) were obatained by aggregatig occurrence points in a grid. The main limitation of the grid based approach to generate maps of biodiversity is that they tend to be only useful at coarser spatial scale thus the results of this is expected to fill the gap in fine scale biodiversity maps for three major functional groups.
+
+There are previous works off the coast of South Africa in the studying species composition and community strucure, mostly restricted between the nearshore and the shelf/shelf-edge regions but none looked at the spatial pattern in biodiversity across multiple functional groups and at the scale of the whole _EEZ_ as done in this study. Some of the works on species composition/community structure, prsented by groups, include: demersal fishes communtity structure [@atkinson2011changes], biomass and production of zooplankton [@huggett2009copepod], biodiversity/species richness of demersal fishes [@kirkman2013identifying; @yemane2010spatio; @yemane2015spatio]. Pattern in biodivesity, either overall or by taxonomic groups, and factors regulating them has been studied widely and a range of hypothesis have been put forward e.g in the context of latitudinal pattern in diversity [@willig2003latitudinal]; characterization of patterns in biodiversity, identification of physical and envionmental conditions shaping pattern in diversity [@kirkman2013identifying]; relationship of diversity to ecosystem stability, resilience and functioning [@beaumont2007identification; @o2004biodiversity]. It has been shown in a range of studies (including those listed above) that spatial structure of fish communities is strongly structured by depth, serving as proxy for a range of physiologically and ecologically important factors (or processes). The result of this study also hilights the important influence of depth, followed by bottom temperature, on the distribution and hence the diversity of fishes. Areas of high fish diversity on the west coast, also identified as such in [@kirkman2013identifying; @yemane2015spatio; @grantham2011accommodating], are associated with shlelf-edge or slope regions. These area are aso characterized by higher demersal fishing effort as the work of @fairweather2006spatial shows. These areas of high fish diversity are also slightly offshore areas of high biomass and production of zooplanktons [@huggett2009copepod]. On the South coast areas of high-diversity were in the shallower areas closer to the coast and mid-shelf on the Agulhas bank. The near shore and shelf areas of the southern benguela upwelling system is generally characterised by high zooplankton production and biomass [@huggett2009copepod; @grantham2011accommodating] but the result of this study, although there are fewer zooplankton species, shows that most of these areas are also characteriized by relatively high zooplankton diversity. The most common factor affecting distribution and hence diversity of zooplanktons were bottom depth and surface temperature, work on the factors influencing the diversity of zooplankton in the Gulf of Maine shows that bathymetry, proximity to coast, and advection were important [@johnson2011biodiversity]. Regions of high benthic diversity are restrictd to shallower water/nearshore area and on the east coast. The distribution of benthos and hence their diversity was mostly influenced by bottom depth, botttom and surface temperature. Bottom depth has been shown to influence the diversity of marine benthos [e.g A continental scale study on pattern of biodiversity of marine benthos @renaud2009continental; environmental infuence of seabed diversity using tropical North East Australia, deep Gulf of Mexico, temperate Gulf of Maine as case studies @roland2012exploring].   
+
+Documentation, characterization and identificaion of pattern in biodiversity or their surrogates, when no direct measure is available, is an important component of conservation planning. This is largely due to known and expected impacts of loss of biodiversity on goods and services that ecosystems provide [@hooper2012global; @worm2006impacts]. 
+The work of @worm2006impacts also shows the potential values of restoring biodiversity.
+
+The work of @molinos2016climate shows the potential for future reogranization of spatial pattteren in biodiversity largely driven by chanages in distribution rather than loss of species. Hilighting the need to understand of the current spatial pattern in biodiversity and potential future reorgnaizations to develop an adaptive conservation (or spatial management) approach that take into acount these expected changes. 
+
+# Appendix
+
+## Appendix A
+
+Raw biodiversity (species richness) maps for each of the three functional groups compiled by 20-years, except for the early and present period. For the earliest period all occurrence data prior to the 1900 were lumped to construct the biodiversity maps. Similarly   the biodiversity maps for the present periods all the data after the 2000s were combined to construct biodiversity maps. Occurrence of each of the species in a functional groups were aggregated in a grid with 100X100 resolution to generate the species richness by grid cell. The biodiversity maps for zooplankton, fishes, and benthos are presented in figures `r figCaps('figA1',display='cite')`, `r figCaps('figA2', display='cite')`, and `r figCaps('figA3', display='cite')` respectively. For all the three groups for the earlier periods prior to the 1980s, samples were not limited to nearshore/coastal area and in fact were scattered throughout the _EEZ_. The highest concentration of samples were collected during the 1980-2000 period but they were almost exclusively tied to the continental shelf or slope region upto a depth of 1000m.  For zooplankton areas from nearshore/coastal to shelf/slope regions on both the west and south coast were characterized by the highest richness. For benthos high richness were observed in nearshore/coastal areas and on the east coast. For fishes high species richness were observed on the shelf and slope region on the west coast but nearshore to slope region on the east coast.
+
+
+```{r figA1,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,dpi=350,warning=FALSE}
+map_rich_zoo_grp10%>%filter(!is.na(Year_grp))%>%ggplot()+geom_tile(aes(x,y,fill=n_grp))+
+  scale_fill_manual(values = col_code,name='number of species')+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~Year_grp)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figA1')`
+
+
+
+```{r figA2,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+map_rich_fish_grp10%>%filter(!is.na(Year_grp))%>%ggplot()+geom_tile(aes(x,y,fill=n_grp))+
+  scale_fill_manual(values = col_code,name='number of species')+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~Year_grp)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figA2')`
+
+```{r figA3,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+map_rich_benthos_grp10%>%filter(!is.na(Year_grp))%>%ggplot()+geom_tile(aes(x,y,fill=n_grp))+
+  scale_fill_manual(values = col_code,name='number of species')+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~Year_grp)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figA3')`
+
+
+## Appendix B
+
+For sake of completion and to serve as comparison to the biodiversity maps presented in the result section biodiversity maps constructed  by _stacking binaries_ and _stacking probability_ are presented below. Biodiversity maps for the three functional groups, zooplankton, benthos, and fishes, obtained using two alternative methods: _stacking binaries_ and _stacking probabilities_ are shown in `r figCaps('figB1')` and `r figCaps('figB2',display='cite')` respectively.
+
+
+```{r figB1,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=5,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+fish_al_bssdm<-all_biodiversity_long_bssdm%>%filter(func_grps=='Fish')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+benthos_al_bssdm<-all_biodiversity_long_bssdm%>%filter(func_grps=='Benthos')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+zoo_al_bssdm<-all_biodiversity_long_bssdm%>%filter(func_grps=='Zooplankton')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+
+gridExtra::grid.arrange(fish_al_bssdm,benthos_al_bssdm,zoo_al_bssdm,nrow=1)
+
+```
+`r figCaps('figB1')`
+
+
+```{r figB2,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=5,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+### plot based on the pssdm (stacking prpbability methods)
+fish_al_pssdm<-all_biodiversity_long_pssdm%>%filter(func_grps=='Fish')%>%
+  ggplot()+
+  geom_tile(aes(x,y,fill=richness))+
+  scale_fill_gradientn(name='richness',colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill="gray50")+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+benthos_al_pssdm<-all_biodiversity_long_pssdm%>%filter(func_grps=='Benthos')%>%
+  ggplot()+
+  geom_tile(aes(x,y,fill=richness))+
+  scale_fill_gradientn(name='richness',colours = jet.colors(100))+
+  geom_sf(data=sa_shape,fill="gray50")+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+zoo_range <-all_biodiversity_long_pssdm%>%filter(func_grps=='Zooplankton')%>%dplyr::pull(richness)%>%range()
+
+zoo_al_pssdm<-all_biodiversity_long_pssdm%>%filter(func_grps=='Zooplankton')%>%
+  ggplot()+
+  geom_tile(aes(x,y,fill=richness))+
+  scale_fill_gradientn(name='richness',colours = jet.colors(100),breaks = round(seq(zoo_range[1],zoo_range[1],length.out = 5)),
+                       labels=round(seq(zoo_range[1],zoo_range[2],length.out = 5)))+
+  geom_sf(data=sa_shape,fill="gray50")+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+theme_bw()+theme(text = element_text(size = 12))
+
+gridExtra::grid.arrange(fish_al_pssdm,benthos_al_pssdm,zoo_al_pssdm,nrow=1)
+
+```
+`r figCaps('figB2')`
+
+## Appendix C
+
+Distribution maps of selected of species from the three functional groups with observed occurrence data are presented below. For selected sets of fish, benthos, and zooplankton distribution maps overlayed with the known occurrence are shown below in `r figCaps('figC1',display='cite')` and `r figCaps('figC2',display='cite')` for fishes, `r figCaps('figC3', display='cite')` and `r figCaps('figC4', display='cite')` for benthos, and `r figCaps('figC5',display='cite')` and `r figCaps('figC6',display='cite')` for zooplankton.
+
+
+```{r append_b,eval=TRUE,echo=FALSE,include=FALSE,cache=FALSE}
+
+sel_fish <-c("Sardinops sagax", "Engraulis encrasicolus", "Etrumeus whiteheadi", 
+             "Merluccius capensis", "Merluccius paradoxus", "Trachurus capensis", 
+             "Lampanyctodes hectoris", "Austroglossus pectoralis", "Thyrsites atun", 
+             "Genypterus capensis", "Scomber japonicus", "Loligo vulgaris reynaudi", 
+             "Callorhinchus capensis", "Chelidonichthys queketti", "Maurolicus muelleri", 
+             "Chelidonichthys capensis")
+sel_inv2 <-c("Chaceon chuni", "Echinus gilchristi", "Exodromidia spinosa", 
+             "Marthasterias glacialis", "Mursia cristiata", "Toraster tuberculatus","Emarginula natalensis",
+             "Nassarius eusulcatus","Goneplax rhomboides","Luidia atlantidea","Xenophora solarioides","Vexillum sculptile")
+
+sel_zoo <- c("Calanoides carinatus", "Calanoides", "Calanus agulhensis", 
+             "Centropages", "Clausocalanus", "Ctenocalanus", "Euphausia lucens", 
+             "Funchalia woodwardi", "Funchalia", "Metridia", "Oithona", "Paracalanus pygmaeus", 
+             "Pleuromamma", "Rhincalanus", "Sergestes", "Sergia")
+
+```
+
+
+```{r figC1,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+fish_dist_sel%>%filter(species%in%sel_fish[1:8])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=fish_pres_sel%>%filter(species%in%sel_fish[1:8]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 3)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+
+```
+`r figCaps('figC1')`
+
+```{r figC2,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+fish_dist_sel%>%filter(species%in%sel_fish[9:16])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=fish_pres_sel%>%filter(species%in%sel_fish[9:16]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+
+```
+`r figCaps('figC2')`
+
+```{r figC3,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+benthos_dist_sel%>%filter(species%in%sel_inv2[1:6])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=benthos_pres_sel%>%filter(species%in%sel_inv2[1:6]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figC3')`
+
+```{r figC4,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+benthos_dist_sel%>%filter(species%in%sel_inv2[7:12])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=benthos_pres_sel%>%filter(species%in%sel_inv2[7:12]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figC4')`
+
+
+```{r figC5,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+zoo_dist_sel%>%filter(species%in%sel_zoo[1:8])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=zoo_pres_sel%>%filter(species%in%sel_zoo[1:8]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figC5')`
+
+```{r figC6,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=12,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+
+zoo_dist_sel%>%filter(species%in%sel_zoo[9:16])%>%ggplot()+geom_tile(aes(x,y,fill=Probability))+
+  scale_fill_gradientn(colors = fields::tim.colors(100),name='probability of\n occurrence')+
+  geom_point(data=zoo_pres_sel%>%filter(species%in%sel_zoo[9:16]),aes(X,Y),shape=1,size=0.3)+
+  geom_sf(data=sa_shape,fill=NA)+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~species)+theme_bw()+theme(text = element_text(size = 12))
+
+```
+`r figCaps('figC6')`
+
+## Appendix D
+
+species richness by selected classes: _Actinopterygii_, _Cephalopoda_, _Elasmobranchii_. These classes generally made up 98% of the species modelled `r figCaps('figD1', display='cite')`.
+
+```{r figD1,echo=FALSE,eval=T,fig.align="center",tidy=T,fig.width=14,fig.height=5,tidy.opts=list(blank=FALSE, width.cutoff=55),cache=FALSE,message=FALSE,warning=FALSE,dpi=350}
+ceph_al_ml<-class_biodiversity_long_ml%>%filter(func_grps=='Cephalopoda')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = fields::tim.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+
+  theme_bw()+theme(text = element_text(size = 12))
+elasmo_al_ml<-class_biodiversity_long_ml%>%filter(func_grps=='Elasmobranchii')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = fields::tim.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+
+  theme_bw()+theme(text = element_text(size = 12))
+actino_al_ml<-class_biodiversity_long_ml%>%filter(func_grps=='Actinopterygii')%>%ggplot()+geom_tile(aes(x,y,fill=richness))+scale_fill_gradientn(colours = fields::tim.colors(100))+
+  geom_sf(data=sa_shape,fill='gray50')+geom_sf(data=eez_sAfr_sf,fill=NA)+labs(y='latitude',x='longitude')+
+  scale_x_longitude(xmin = 13,xmax = 37,step = 4)+scale_y_latitude(ymin = -38,ymax = -26,step = 3)+
+  facet_wrap(~func_grps)+
+  theme_bw()+theme(text = element_text(size = 12))
+
+gridExtra::grid.arrange(ceph_al_ml,elasmo_al_ml,actino_al_ml,nrow=1)
+
+```
+`r figCaps('figD1')`
+
+
+#Session information
+
+```{r,eval=TRUE,echo=TRUE,collapse=TRUE}
+#Here is the R Session for this analysis
+sessionInfo()
+```
+
+#References
+
+```{r, include=FALSE,eval=TRUE}
+knitr::write_bib(c('base','rmarkdown','knitr','robis','ggplot2','tidyverse','captioner',"raster","sf","purrr",
+                   "magrittr",'rgeos','rgdal','sdmpredictors','SSDM'), 'Refs-requiredLibs_Analysis.bib')
+```
