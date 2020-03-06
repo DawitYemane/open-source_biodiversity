@@ -1,0 +1,22 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# open-source biodiversity maps
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+This repository contains the codes and most of the data used in the publication _Use of openly available occurrence data to generate biodiversity maps within the South African EEZ_ that is currently in press in the _African Journal of Marine Science_ [publication details to follow soon]. The main purpose of the projec are: 
+
+ - To demonstrate how readily available species occurence data and environmental data can be used to construct maps of biodiveristy by stacking species distribution maps
+ - To provide comprehensive maps of biodiversity of _benthos_, _fishes_, and _zooplanktons_ within the _EEZ_ of South Africa 
