@@ -18,3 +18,12 @@ to follow soon\]. The main purpose of the projec are:
     stacking species distribution maps
   - To provide comprehensive maps of biodiversity of *benthos*,
     *fishes*, and *zooplanktons* within the *EEZ* of South Africa
+
+# Note
+
+Currently the R codes used throughout the lifecycle of this project and
+locally (on my laptop) compiled report are uploaded to github. The
+processd occurrence data are not uploded in this round largely due to
+file size (about 10GB) which at the moment is costly for the authors to
+both upload to and host in github. At a later stage some parts of the
+processed data will be uploaded.

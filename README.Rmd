@@ -20,3 +20,7 @@ This repository contains the codes and most of the data used in the publication 
 
  - To demonstrate how readily available species occurence data and environmental data can be used to construct maps of biodiveristy by stacking species distribution maps
  - To provide comprehensive maps of biodiversity of _benthos_, _fishes_, and _zooplanktons_ within the _EEZ_ of South Africa 
+
+# Note
+
+Currently the R codes used throughout the lifecycle of this project and locally (on my laptop) compiled report are uploaded to github. The processd occurrence data are not uploded in this round largely due to file size (about 10GB) which at the moment is costly for the authors to both upload to and host in github. At a later stage some parts of the processed data will be uploaded.
